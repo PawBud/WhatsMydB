@@ -1,0 +1,22 @@
+# Build directories
+/build/
+cmake-build-debug/
+cmake-build-release/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+*.cmake
+
+# CLion IDE files
+.idea/
+*.iml
+
+# macOS specific files
+.DS_Store
+
+# Log files
+*.log
+
+# Temporary files
+*.swp
+*.swo
