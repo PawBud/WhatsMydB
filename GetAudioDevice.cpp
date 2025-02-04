@@ -1,14 +1,16 @@
 #include <iostream>
+#include <cstdint>
 #include <CoreAudio/CoreAudio.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include "AudioTapper.h"
+#include "AudioInfo.h"
 
-OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string& deviceName) {
+OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string &deviceName) {
     // Get the size of the device name
     unsigned int dataSize = 0;
     AudioObjectPropertyAddress propertyAddress = {
         kAudioDevicePropertyDeviceNameCFString,
-        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyScopeOutput,
         kAudioObjectPropertyElementMain
     };
 
@@ -27,13 +29,13 @@ OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string& deviceName) {
     }
 
     // Convert CFString to std::string
-    const char* nameCStr = CFStringGetCStringPtr(deviceNameCFString, kCFStringEncodingUTF8);
+    const char *nameCStr = CFStringGetCStringPtr(deviceNameCFString, kCFStringEncodingUTF8);
     if (nameCStr != nullptr) {
         deviceName = std::string(nameCStr);
     } else {
         CFIndex length = CFStringGetLength(deviceNameCFString);
         CFRange range = CFRangeMake(0, length);
-        char* buffer = new char[length + 1];
+        char *buffer = new char[length + 1];
         if (CFStringGetCString(deviceNameCFString, buffer, length + 1, kCFStringEncodingUTF8)) {
             deviceName = std::string(buffer);
         }
@@ -46,36 +48,32 @@ OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string& deviceName) {
     return noErr;
 }
 
+std::string getFormatName(uint32_t formatID) {
+    char formatName[5]; // FourCC is 4 chars + null terminator
+    formatName[0] = static_cast<char>((formatID >> 24) & 0xFF); // Extract MSB
+    formatName[1] = static_cast<char>((formatID >> 16) & 0xFF);
+    formatName[2] = static_cast<char>((formatID >> 8) & 0xFF);
+    formatName[3] = static_cast<char>(formatID & 0xFF); // Extract LSB
+    formatName[4] = '\0'; // Null terminate
+
+    return std::string(formatName);
+}
+
 int main() {
     AudioDeviceID outputDeviceID = kAudioObjectUnknown;
     unsigned int propertySize = sizeof(outputDeviceID);
 
-    // Get the current output device
-    AudioObjectPropertyAddress propertyAddress = {
-        kAudioHardwarePropertyDefaultOutputDevice,
-        kAudioObjectPropertyScopeGlobal,
-        kAudioObjectPropertyElementMain
-    };
-
-    OSStatus status = AudioObjectGetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, nullptr, &propertySize, &outputDeviceID);
-    if (status != noErr) {
-        std::cerr << "Error getting the current output device: " << status << std::endl;
-        return 1;
-    }
+    // Get the ID of the output device
+    getDeviceID(outputDeviceID);
 
     // Get the name of the output device
     std::string deviceName;
-    status = GetAudioDeviceName(outputDeviceID, deviceName);
-    
+    OSStatus status = GetAudioDeviceName(outputDeviceID, deviceName);
+    std::cout << "current device output name: " << deviceName << std::endl;
     if (status != noErr) {
         std::cerr << "Error getting device name" << std::endl;
         return 1;
     }
-
-    std::cout << "Output Device ID: " << outputDeviceID << std::endl;
-    std::cout << "Device Name: " << deviceName << std::endl;
-
     SetupAudioTap(outputDeviceID);
-
     return 0;
 }
