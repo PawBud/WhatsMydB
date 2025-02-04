@@ -26,7 +26,7 @@ void getSampleRate(AudioDeviceID const device_id, double &sample_rate) {
     AudioObjectPropertyAddress propertyAddress = {
         kAudioDevicePropertyNominalSampleRate,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &sample_rate_size, &sample_rate);
@@ -44,7 +44,7 @@ void getFormatID(AudioDeviceID const device_id, AudioFormatID& audio_format) {
     AudioObjectPropertyAddress propertyAddress = {
         kAudioDevicePropertyStreamFormat,  // FIXED
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster  // FIXED
+        kAudioObjectPropertyElementMain  // FIXED
     };
 
     // Get the stream format
@@ -223,7 +223,7 @@ void getFormatFlags(AudioDeviceID const device_id, AudioFormatFlags &audio_forma
     AudioObjectPropertyAddress propertyAddress = {
         kAudioDevicePropertyStreamFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     // Retrieve the full stream format
@@ -243,7 +243,7 @@ void getBitsPerChannel(AudioDeviceID const device_id, unsigned int &bits_per_cha
     AudioObjectPropertyAddress propertyAddress = {
         kAudioStreamPropertyPhysicalFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
@@ -262,7 +262,7 @@ void getBytesPerFrame(AudioDeviceID const device_id, unsigned int &bytes_per_fra
     AudioObjectPropertyAddress propertyAddress = {
         kAudioStreamPropertyPhysicalFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
@@ -281,7 +281,7 @@ void getChannelsPerFrame(AudioDeviceID const device_id, unsigned int &channels_p
     AudioObjectPropertyAddress propertyAddress = {
         kAudioStreamPropertyPhysicalFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
@@ -301,7 +301,7 @@ void getBytesPerPacket(AudioDeviceID const device_id, unsigned int &bytes_per_pa
     AudioObjectPropertyAddress propertyAddress = {
         kAudioStreamPropertyPhysicalFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
@@ -321,7 +321,7 @@ void getFramesPerPacket(AudioDeviceID const device_id, unsigned int &frames_per_
     AudioObjectPropertyAddress propertyAddress = {
         kAudioStreamPropertyPhysicalFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
