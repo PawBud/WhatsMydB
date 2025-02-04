@@ -3,10 +3,13 @@
 #include <AudioUnit/AudioUnit.h>
 #include <CoreAudio/CoreAudio.h>
 
+struct AudioCallbackData {
+    AudioUnit  audioUnit;
+    AudioStreamBasicDescription stream_format;
+};
 void SetupAudioTap(AudioDeviceID deviceID);
 
 // incomplete
-
 OSStatus AudioTapCallback(void* inRefCon,
                       AudioUnitRenderActionFlags* ioActionFlags,
                       const AudioTimeStamp* inTimeStamp,

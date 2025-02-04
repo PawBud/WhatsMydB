@@ -1,155 +1,90 @@
 #include <iostream>
-#include <iomanip>
+#include <cstdint>
 #include "GetAudioDevice.h"
 #include "AudioInfo.h"
 #include <arpa/inet.h>
 #include <AudioUnit/AudioUnit.h>
 #include <CoreAudio/CoreAudio.h>
 
-std::ostream& operator<<(std::ostream& out, const AudioStreamBasicDescription& format)
-{
-    unsigned char formatID [5];
-    *(UInt32 *)formatID = OSSwapHostToBigInt32(format.mFormatID);
-    formatID[4] = '\0';
 
-    // General description
-    std::cout << format.mBytesPerFrame << ", " << format.mChannelsPerFrame << " ch, " << format.mSampleRate << " Hz, '" << formatID << "' (0x" << std::hex << std::setw(8) << std::setfill('0') << format.mFormatFlags << std::dec << ") ";
-
-    if(kAudioFormatLinearPCM == format.mFormatID) {
-        // Bit depth
-        UInt32 fractionalBits = ((0x3f << 7)/*kLinearPCMFormatFlagsSampleFractionMask*/ & format.mFormatFlags) >> 7/*kLinearPCMFormatFlagsSampleFractionShift*/;
-        if(0 < fractionalBits)
-            std::cout << (format.mBitsPerChannel - fractionalBits) << "." << fractionalBits;
-        else
-            std::cout << format.mBitsPerChannel;
-
-        std::cout << "-bit";
-
-        // Endianness
-        bool isInterleaved = !(kAudioFormatFlagIsNonInterleaved & format.mFormatFlags);
-        UInt32 interleavedChannelCount = (isInterleaved ? format.mChannelsPerFrame : 1);
-        UInt32 sampleSize = (0 < format.mBytesPerFrame && 0 < interleavedChannelCount ? format.mBytesPerFrame / interleavedChannelCount : 0);
-        if(1 < sampleSize)
-            std::cout << ((kLinearPCMFormatFlagIsBigEndian & format.mFormatFlags) ? " big-endian" : " little-endian");
-
-        // Sign
-        bool isInteger = !(kLinearPCMFormatFlagIsFloat & format.mFormatFlags);
-        if(isInteger)
-            std::cout << ((kLinearPCMFormatFlagIsSignedInteger & format.mFormatFlags) ? " signed" : " unsigned");
-
-        // Integer or floating
-        std::cout << (isInteger ? " integer" : " float");
-
-        // Packedness
-        if(0 < sampleSize && ((sampleSize << 3) != format.mBitsPerChannel))
-            std::cout << ((kLinearPCMFormatFlagIsPacked & format.mFormatFlags) ? ", packed in " : ", unpacked in ") << sampleSize << " bytes";
-
-        // Alignment
-        if((0 < sampleSize && ((sampleSize << 3) != format.mBitsPerChannel)) || (0 != (format.mBitsPerChannel & 7)))
-            std::cout << ((kLinearPCMFormatFlagIsAlignedHigh & format.mFormatFlags) ? " high-aligned" : " low-aligned");
-
-        if(!isInterleaved)
-            std::cout << ", deinterleaved";
-    }
-    else if(kAudioFormatAppleLossless == format.mFormatID) {
-        UInt32 sourceBitDepth = 0;
-        switch(format.mFormatFlags) {
-            case kAppleLosslessFormatFlag_16BitSourceData:      sourceBitDepth = 16;    break;
-            case kAppleLosslessFormatFlag_20BitSourceData:      sourceBitDepth = 20;    break;
-            case kAppleLosslessFormatFlag_24BitSourceData:      sourceBitDepth = 24;    break;
-            case kAppleLosslessFormatFlag_32BitSourceData:      sourceBitDepth = 32;    break;
-        }
-
-        if(0 != sourceBitDepth)
-            std::cout << "from " << sourceBitDepth << "-bit source, ";
-        else
-            std::cout << "from UNKNOWN source bit depth, ";
-
-        std::cout << format.mFramesPerPacket << " frames/packet";
-    }
-    else
-        std::cout << format.mBitsPerChannel << " bits/channel, " << format.mBytesPerPacket << " bytes/packet, " << format.mFramesPerPacket << " frames/packet, " << format.mBytesPerFrame << " bytes/frame";
-
-    return out;
-}
-
-
-OSStatus RenderAudio(AudioUnit audioUnit) {
-    OSStatus status = noErr;
-    AudioBufferList bufferList = {0};
-
-    // Set number of buffers (1 buffer for stereo)
-    bufferList.mNumberBuffers = 1;
-
-    // Number of channels (2 channels for stereo)
-    bufferList.mBuffers[0].mNumberChannels = 2;  // Stereo
-
-    // Set the buffer size (Assuming 512 frames, 6 bytes per frame for 24-bit stereo)
-    size_t bufferSize = 512 * 6;
-    bufferList.mBuffers[0].mData = malloc(bufferSize);
-    bufferList.mBuffers[0].mDataByteSize = bufferSize;
-
-    if (bufferList.mBuffers[0].mData == nullptr) {
-        std::cerr << "Error allocating memory for buffer!" << std::endl;
-        return -1;
-    }
-
-    // Create a valid timestamp
-    AudioTimeStamp inTimeStamp = {0};  // Initialize it to 0
-    inTimeStamp.mSampleTime = 0;  // You can adjust this time depending on your needs
-
-    // Set flags to 0 (no action flags)
-    AudioUnitRenderActionFlags ioActionFlags = 0;
-
-    // Use 0 for busNumber if it's the default audio output
-    UInt32 inBusNumber = 0;
-
-    // Render audio
-    status = AudioUnitRender(audioUnit, &ioActionFlags, &inTimeStamp, inBusNumber, 512, &bufferList);
-    if (status != noErr) {
-        std::cerr << "AudioUnitRender failed with error: " << status << std::endl;
-        free(bufferList.mBuffers[0].mData);  // Free allocated memory
-        return status;
-    }
-
-    // Use bufferList.mBuffers[0].mData for the audio data here
-    // Make sure to process the audio data after rendering
-
-    free(bufferList.mBuffers[0].mData);  // Free allocated memory
-    return status;
-}
+struct AudioCallbackData {
+    AudioUnit  audioUnit;
+    AudioStreamBasicDescription stream_format;
+};
 
 OSStatus AudioTapCallback(void* inRefCon,
                           AudioUnitRenderActionFlags* ioActionFlags,
                           const AudioTimeStamp* inTimeStamp,
-                          unsigned int inBusNumber,
-                          unsigned int inNumberFrames,
+                          UInt32 inBusNumber,
+                          UInt32 inNumberFrames,
                           AudioBufferList* ioData) {
-    const float referenceAmplitude = 8388608.0f; // Max amplitude for 24-bit signed integer (2^23)
-    float sumSquares = 0.0f;  // For RMS calculation
+
+    const float referenceAmplitude = 8388608.0f;
+    float sumSquares = 0.0f;
     int totalSamples = 0;
 
-    for (unsigned int bufferIndex = 0; bufferIndex < ioData->mNumberBuffers; ++bufferIndex) {
-        AudioBuffer buffer = ioData->mBuffers[bufferIndex];
-        int32_t* audioData = static_cast<int32_t*>(buffer.mData); // Assuming 24-bit data is packed in 32-bit
-        int dataSize = buffer.mDataByteSize / sizeof(int32_t); // Number of samples in this buffer
-
-        std::cout << "Buffer size: " << buffer.mDataByteSize << " bytes, Number of samples: " << dataSize << std::endl;
-
-        for (int i = 0; i < dataSize; ++i) {
-            // Check if the sample data is in the expected range
-            int32_t rawSample = audioData[i];
-            std::cout << "Sample " << i << ": " << rawSample << std::endl;
-
-            // Normalize to [-1, 1] by dividing by the reference amplitude
-            float normalizedSample = static_cast<float>(rawSample) / referenceAmplitude;
-            sumSquares += normalizedSample * normalizedSample;
-            totalSamples++;
-        }
+    // Retrieve callback data
+    AudioCallbackData* callbackData = static_cast<AudioCallbackData*>(inRefCon);
+    if (!callbackData) {
+        std::cerr << "Error: Callback data is NULL!" << std::endl;
+        return -1;
     }
 
+    AudioUnit audioUnit = callbackData->audioUnit;
+    AudioStreamBasicDescription streamFormat = callbackData->stream_format;
+
+    AudioBufferList* bufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + sizeof(AudioBuffer));
+    if (!bufferList) {
+        std::cerr << "Error: Failed to allocate buffer list!" << std::endl;
+        return -1;
+    }
+
+    std::cout << "mChannelsPerFrame: " << streamFormat.mChannelsPerFrame << std::endl;
+    std::cout << "mBytesPerFrame: " << streamFormat.mBytesPerFrame << std::endl;
+    std::cout << "inNumberFrames: " << inNumberFrames << std::endl;
+    std::cout << "inNumberFrames * streamFormat.mBytesPerFrame: " << inNumberFrames * streamFormat.mBytesPerFrame << std::endl;
+
+
+
+    bufferList->mNumberBuffers = 1;
+    bufferList->mBuffers[0].mNumberChannels = streamFormat.mChannelsPerFrame;
+    bufferList->mBuffers[0].mDataByteSize = 1600;
+    bufferList->mBuffers[0].mData = malloc(bufferList->mBuffers[0].mDataByteSize);
+
+    if (!bufferList->mBuffers[0].mData) {
+        std::cerr << "Error: Failed to allocate audio buffer!" << std::endl;
+        free(bufferList);
+        return -1;
+    }
+
+    // Fetch the audio data from the system
+    OSStatus status = AudioUnitRender(audioUnit, ioActionFlags, inTimeStamp,
+                                      inBusNumber, 200, bufferList);
+    if (status != noErr) {
+        std::cerr << "Error rendering audio: " << status << std::endl;
+        free(bufferList->mBuffers[0].mData);
+        return status;
+    }
+
+    // Process audio data: Convert to dB
+    int32_t* audioData = static_cast<int32_t*>(bufferList->mBuffers[0].mData);
+    int numSamples = bufferList->mBuffers[0].mDataByteSize / sizeof(int32_t);
+
+    std::cout << "Buffer size: " << bufferList->mBuffers[0].mDataByteSize
+              << " bytes, Number of samples: " << numSamples << std::endl;
+
+    for (int i = 0; i < numSamples; ++i) {
+        int32_t rawSample = audioData[i];
+
+        // Normalize sample to [-1, 1]
+        float normalizedSample = static_cast<float>(rawSample) / referenceAmplitude;
+        sumSquares += normalizedSample * normalizedSample;
+        totalSamples++;
+    }
+
+    // Compute RMS and convert to dB
     if (totalSamples > 0) {
-        float rms = sqrt(sumSquares / totalSamples);  // RMS value
+        float rms = sqrt(sumSquares / totalSamples);
         float decibels = (rms > 0.0001f) ? 20.0f * log10(rms) : -96.0f; // Avoid log(0)
 
         std::cout << "RMS Level: " << decibels << " dB" << std::endl;
@@ -157,6 +92,9 @@ OSStatus AudioTapCallback(void* inRefCon,
         std::cerr << "No valid audio data received!" << std::endl;
     }
 
+    // Clean up
+    free(bufferList->mBuffers[0].mData);
+    free(bufferList);
     return noErr;
 }
 
@@ -201,6 +139,7 @@ void getDeviceStreamFormats(AudioDeviceID &device_id, AudioStreamBasicDescriptio
 }
 
 void SetupAudioTap(AudioDeviceID deviceID) {
+    // Get the stream format
     AudioStreamBasicDescription stream_format;
     getDeviceStreamFormats(deviceID, stream_format);
 
@@ -224,7 +163,7 @@ void SetupAudioTap(AudioDeviceID deviceID) {
         return;
     }
 
-    // Enable input on the audio unit
+    // Enable input
     int enableIO = 1;
     status = AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_EnableIO,
                                   kAudioUnitScope_Input, 1, &enableIO, sizeof(enableIO));
@@ -241,6 +180,30 @@ void SetupAudioTap(AudioDeviceID deviceID) {
         return;
     }
 
+    // Set the stream format
+    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat,
+                                  kAudioUnitScope_Output, 1, &stream_format, sizeof(stream_format));
+    if (status != noErr) {
+        std::cerr << "Error setting stream format: " << status << std::endl;
+        return;
+    }
+
+    // Passing the data to the callback struct
+    AudioCallbackData* audio_callback_data = new AudioCallbackData();
+    audio_callback_data->audioUnit = audioUnit;
+    audio_callback_data->stream_format = stream_format;
+
+    // Set the input callback
+    AURenderCallbackStruct callback;
+    callback.inputProc = AudioTapCallback;
+    callback.inputProcRefCon = audio_callback_data;
+
+    status = AudioUnitSetProperty(audioUnit, kAudioUnitProperty_SetRenderCallback,
+                                  kAudioUnitScope_Input, 0, &callback, sizeof(callback));
+    if (status != noErr) {
+        std::cerr << "Error setting input callback: " << status << std::endl;
+        return;
+    }
 
     // Initialize and start the audio unit
     status = AudioUnitInitialize(audioUnit);
@@ -254,15 +217,10 @@ void SetupAudioTap(AudioDeviceID deviceID) {
         std::cerr << "Error starting audio unit: " << status << std::endl;
     }
 
-    // if (inputASBL.mFormatFlags != kAudioFormatFlagsNativeFloatPacked) {
-    //     std::cerr << "Unexpected format flags!" << std::endl;
-    //     return;
-    // }
-
-
     std::cout << "Audio tap is running. Press any key to stop." << std::endl;
     getchar();
 
     AudioOutputUnitStop(audioUnit);
     AudioComponentInstanceDispose(audioUnit);
+    delete audio_callback_data;
 }

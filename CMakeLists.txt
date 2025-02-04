@@ -5,10 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_executable(
         Whats_my_dB
+        src/GetAudioDevice.h
         src/GetAudioDevice.cpp
         src/AudioTapper.cpp
         src/AudioTapper.h
-        src/GetAudioDevice.h
         src/AudioInfo.cpp
         src/AudioInfo.h
 )
