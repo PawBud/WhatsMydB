@@ -20,3 +20,6 @@ Makefile
 # Temporary files
 *.swp
 *.swo
+
+# media
+media/decibel.drawio

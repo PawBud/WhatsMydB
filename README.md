@@ -1,19 +1,22 @@
+<div align="center">
+    <img src="./media/Decibel%20Diagram.png" alt="sine wave">
+</div>
+
 # What's my DB?
 This application simply displays the current audio output’s dB level 
 on the macOS toolbar.
 
-## Sound Theory
-### Introduction
+## Background
+### Recalling Sound Theory
 Well, as we all know, the sound that we hear are a result of molecules in the air, that undergo 
 compression & rarefraction.
 
 ### Storing audio samples
-Let's look at a wave
 ![sine wave](./media/Sinewave.png)
 
 *The picture above is that of a sine wave, the simplest to understand, arguably.*
 
-It has a specific amplitude, which exhibits rarefaction, as the wave approaches the x-axis, it becomes more compressed.
+Let's look at a wave, it has a specific amplitude, which exhibits rarefaction, as the wave approaches the x-axis, it becomes more compressed.
 Well, how do we store this analog signal inside a computer? Solution: [PCM Format](https://en.wikipedia.org/wiki/Pulse-code_modulation#:~:text=Pulse%2Dcode%20modulation%20(PCM),and%20other%20digital%20audio%20applications.).
 An analog signal (like the sine wave stored above) is sampled at regular intervals. Usually, 44,100 times per second. You might
 have seen 44.1KHz sampling rate ..... well this is what it is. So basically, the higher the sampling rate, the more "accurate" or well "clear"
@@ -32,9 +35,12 @@ It works by tapping into the audio stream to collect data about the sound being 
 The basic idea is to capture the audio output without modifying it, essentially allowing one to “listen in” on the system’s audio stream.
 
 ## Architecture
-1. Main:
-    - Gets the current audio output ID
-    - Calls then Audio Tapper function
+1. GetAudioDevice:
+    - gets the audio device id
+    - prints out some helpful information
 2. AudioTapper:
-    - Creates an Audio Tapper object
-    - Sets the callback function
+    - Creates an Audio Tap object
+    - Enables the object input 
+    - Enables the Audio Tap object
+3. AudioInfo:
+   - The whole file basically retrieves the audio stream information
