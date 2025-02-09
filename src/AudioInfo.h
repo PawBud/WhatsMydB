@@ -5,6 +5,7 @@
 #define AUDIO_DEVICE_INFO_H
 
 #include <CoreAudio/CoreAudio.h>
+#include <AudioToolbox/AudioToolbox.h>
 
 void getDeviceID(AudioDeviceID &device_id);
 
@@ -23,6 +24,8 @@ void getChannelsPerFrame(AudioDeviceID device_id, unsigned int &channels_per_fra
 void getBytesPerPacket(AudioDeviceID device_id, unsigned int &bytes_per_packet);
 
 void getFramesPerPacket(AudioDeviceID device_id, unsigned int &frames_per_packet);
+
+unsigned int getBufferFrameSize(AudioUnit const audioUnit);
 
 #endif // AUDIO_DEVICE_INFO_H
 

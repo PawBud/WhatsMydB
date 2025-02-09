@@ -1,6 +1,6 @@
 #include <iostream>
-#include <CoreAudio/CoreAudio.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <AudioToolbox/AudioToolbox.h>
 
 void getDeviceID(AudioDeviceID &device_id) {
     unsigned int device_id_size = sizeof(device_id);
@@ -42,9 +42,9 @@ void getFormatID(AudioDeviceID const device_id, AudioFormatID& audio_format) {
     AudioStreamBasicDescription stream_format;
 
     AudioObjectPropertyAddress propertyAddress = {
-        kAudioDevicePropertyStreamFormat,  // FIXED
+        kAudioDevicePropertyStreamFormat,
         kAudioObjectPropertyScopeOutput,
-        kAudioObjectPropertyElementMain  // FIXED
+        kAudioObjectPropertyElementMain
     };
 
     // Get the stream format
@@ -331,4 +331,18 @@ void getFramesPerPacket(AudioDeviceID const device_id, unsigned int &frames_per_
         frames_per_packet = stream_format.mFramesPerPacket;
         std::cout << "Frames Per Packet: " << frames_per_packet << std::endl;
     }
+}
+
+unsigned int getBufferFrameSize(AudioUnit const audioUnit) {
+    unsigned int bufferSizeFrames = 0;
+    unsigned int propertySize = sizeof(unsigned int);
+
+    OSStatus status = AudioUnitGetProperty(audioUnit, kAudioDevicePropertyBufferFrameSize, kAudioUnitScope_Global, 0, &bufferSizeFrames, &propertySize);
+    if (status != noErr) {
+        std::cerr << "Couldn't get buffer frame size from input unit " << status << std::endl;
+    }
+
+    UInt32 bufferSizeBytes = bufferSizeFrames * sizeof(Float32);
+
+    return bufferSizeBytes;
 }

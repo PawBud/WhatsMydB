@@ -4,12 +4,12 @@
 #include "AudioInfo.h"
 #include <arpa/inet.h>
 #include <AudioUnit/AudioUnit.h>
-#include <CoreAudio/CoreAudio.h>
 
 
 struct AudioCallbackData {
     AudioUnit  audioUnit;
     AudioStreamBasicDescription stream_format;
+    AudioBufferList* inputBuffer;
 };
 
 OSStatus AudioTapCallback(void* inRefCon,
@@ -32,45 +32,56 @@ OSStatus AudioTapCallback(void* inRefCon,
 
     AudioUnit audioUnit = callbackData->audioUnit;
     AudioStreamBasicDescription streamFormat = callbackData->stream_format;
+    AudioBufferList*& inputBuffer = callbackData->inputBuffer;
 
-    AudioBufferList* bufferList = (AudioBufferList*)malloc(sizeof(AudioBufferList) + sizeof(AudioBuffer));
-    if (!bufferList) {
-        std::cerr << "Error: Failed to allocate buffer list!" << std::endl;
-        return -1;
-    }
+    unsigned int bufferSizeBytes = getBufferFrameSize(audioUnit);
 
-    std::cout << "mChannelsPerFrame: " << streamFormat.mChannelsPerFrame << std::endl;
-    std::cout << "mBytesPerFrame: " << streamFormat.mBytesPerFrame << std::endl;
-    std::cout << "inNumberFrames: " << inNumberFrames << std::endl;
-    std::cout << "inNumberFrames * streamFormat.mBytesPerFrame: " << inNumberFrames * streamFormat.mBytesPerFrame << std::endl;
+    if (streamFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) {
 
+        std::cout << "format is non-interleaved\n" << std::endl;
+        // allocate an AudioBufferList plus enough space for array of AudioBuffers
+        unsigned int propsize = offsetof(AudioBufferList, mBuffers) + (sizeof(AudioBuffer) * streamFormat.mChannelsPerFrame);
 
+        //malloc buffer lists
+        inputBuffer = (AudioBufferList *)malloc(propsize);
+        inputBuffer->mNumberBuffers = streamFormat.mChannelsPerFrame;
 
-    bufferList->mNumberBuffers = 1;
-    bufferList->mBuffers[0].mNumberChannels = streamFormat.mChannelsPerFrame;
-    bufferList->mBuffers[0].mDataByteSize = 1600;
-    bufferList->mBuffers[0].mData = malloc(bufferList->mBuffers[0].mDataByteSize);
+        //pre-malloc buffers for AudioBufferLists
+        for(unsigned int i = 0; i< inputBuffer->mNumberBuffers ; i++) {
+            inputBuffer->mBuffers[i].mNumberChannels = 1;
+            inputBuffer->mBuffers[i].mDataByteSize = bufferSizeBytes;
+            inputBuffer->mBuffers[i].mData = malloc(bufferSizeBytes);
+        }
+    } else {
+        // printf ("format is interleaved\n");
 
-    if (!bufferList->mBuffers[0].mData) {
-        std::cerr << "Error: Failed to allocate audio buffer!" << std::endl;
-        free(bufferList);
-        return -1;
+        // allocate an AudioBufferList plus enough space for array of AudioBuffers
+        UInt32 propsize = offsetof(AudioBufferList, mBuffers) + (sizeof(AudioBuffer) * 1);
+
+        //malloc buffer lists
+        inputBuffer = (AudioBufferList *)malloc(propsize);
+        inputBuffer->mNumberBuffers = 1;
+
+        //pre-malloc buffers for AudioBufferLists
+        inputBuffer->mBuffers[0].mNumberChannels = streamFormat.mChannelsPerFrame;
+        inputBuffer->mBuffers[0].mDataByteSize = bufferSizeBytes;
+        inputBuffer->mBuffers[0].mData = malloc(bufferSizeBytes);
     }
 
     // Fetch the audio data from the system
     OSStatus status = AudioUnitRender(audioUnit, ioActionFlags, inTimeStamp,
-                                      inBusNumber, 200, bufferList);
+                                      inBusNumber, inNumberFrames, inputBuffer);
     if (status != noErr) {
         std::cerr << "Error rendering audio: " << status << std::endl;
-        free(bufferList->mBuffers[0].mData);
+        free(inputBuffer->mBuffers[0].mData);
         return status;
     }
 
     // Process audio data: Convert to dB
-    int32_t* audioData = static_cast<int32_t*>(bufferList->mBuffers[0].mData);
-    int numSamples = bufferList->mBuffers[0].mDataByteSize / sizeof(int32_t);
+    int32_t* audioData = static_cast<int32_t*>(inputBuffer->mBuffers[0].mData);
+    int numSamples = inputBuffer->mBuffers[0].mDataByteSize / sizeof(int32_t);
 
-    std::cout << "Buffer size: " << bufferList->mBuffers[0].mDataByteSize
+    std::cout << "Buffer size: " << inputBuffer->mBuffers[0].mDataByteSize
               << " bytes, Number of samples: " << numSamples << std::endl;
 
     for (int i = 0; i < numSamples; ++i) {
@@ -92,9 +103,6 @@ OSStatus AudioTapCallback(void* inRefCon,
         std::cerr << "No valid audio data received!" << std::endl;
     }
 
-    // Clean up
-    free(bufferList->mBuffers[0].mData);
-    free(bufferList);
     return noErr;
 }
 
@@ -143,13 +151,14 @@ void SetupAudioTap(AudioDeviceID deviceID) {
     AudioStreamBasicDescription stream_format;
     getDeviceStreamFormats(deviceID, stream_format);
 
-    AudioComponentDescription desc = {
+    // generate description that will match audio HAL
+    AudioComponentDescription hal_desc = {
         kAudioUnitType_Output,
         kAudioUnitSubType_HALOutput,
         kAudioUnitManufacturer_Apple
     };
 
-    AudioComponent comp = AudioComponentFindNext(nullptr, &desc);
+    AudioComponent comp = AudioComponentFindNext(nullptr, &hal_desc);
     if (comp == nullptr) {
         std::cerr << "Error finding audio component" << std::endl;
         return;
@@ -165,6 +174,9 @@ void SetupAudioTap(AudioDeviceID deviceID) {
 
     // Enable input
     int enableIO = 1;
+    int disable_flag = 0;
+    AudioUnitScope outputBus = 0;
+    AudioUnitScope inputBus = 1;
     status = AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_EnableIO,
                                   kAudioUnitScope_Input, 1, &enableIO, sizeof(enableIO));
     if (status != noErr) {

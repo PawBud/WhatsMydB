@@ -6,6 +6,7 @@
 struct AudioCallbackData {
     AudioUnit  audioUnit;
     AudioStreamBasicDescription stream_format;
+    AudioBufferList* inputBuffer;
 };
 void SetupAudioTap(AudioDeviceID deviceID);
 
