@@ -33,6 +33,9 @@ The application uses [Core Audio framework](https://developer.apple.com/document
 incoming sample of audio. An Audio Tapper is a tool that allows one to intercept and capture real-time audio from the system’s audio output on a device (like a Mac). 
 It works by tapping into the audio stream to collect data about the sound being played. 
 The basic idea is to capture the audio output without modifying it, essentially allowing one to “listen in” on the system’s audio stream.
+However, it should be noted that Apple intentionally doesn’t expose the system mix for privacy & security reasons. Without a virtual device like BlackHole, there is no legit public 
+CoreAudio API that gives you access to the final system output stream.
+
 
 ## Architecture
 1. GetAudioDevice:

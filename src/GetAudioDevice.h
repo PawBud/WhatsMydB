@@ -3,5 +3,6 @@
 #include <CoreAudio/CoreAudio.h>
 #include <CoreFoundation/CoreFoundation.h>
 
-OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string &deviceName);
+void getDeviceID(AudioDeviceID& device_id);
+OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string& deviceName);
 #endif //GETAUDIODEVICE_H
