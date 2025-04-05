@@ -25,7 +25,9 @@ void getBytesPerPacket(AudioDeviceID device_id, unsigned int &bytes_per_packet);
 
 void getFramesPerPacket(AudioDeviceID device_id, unsigned int &frames_per_packet);
 
-unsigned int getBufferFrameSize(AudioUnit const audioUnit);
+unsigned int getBufferNumberOfFrames(AudioUnit const audioUnit);
+
+void printStreamFormatDetails(AudioDeviceID const device_id);
 
 #endif // AUDIO_DEVICE_INFO_H
 

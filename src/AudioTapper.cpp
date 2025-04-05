@@ -34,7 +34,7 @@ OSStatus AudioTapCallback(void* inRefCon,
     AudioStreamBasicDescription streamFormat = callbackData->stream_format;
     AudioBufferList*& inputBuffer = callbackData->inputBuffer;
 
-    unsigned int bufferSizeBytes = getBufferFrameSize(audioUnit);
+    unsigned int bufferSizeBytes = getBufferNumberOfFrames(audioUnit);
 
     if (streamFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved) {
 
@@ -64,16 +64,28 @@ OSStatus AudioTapCallback(void* inRefCon,
 
         //pre-malloc buffers for AudioBufferLists
         inputBuffer->mBuffers[0].mNumberChannels = streamFormat.mChannelsPerFrame;
-        inputBuffer->mBuffers[0].mDataByteSize = bufferSizeBytes;
-        inputBuffer->mBuffers[0].mData = malloc(bufferSizeBytes);
+        inputBuffer->mBuffers[0].mDataByteSize = 1600;
+
+        // inputBuffer->mBuffers[0].mData = malloc(bufferSizeBytes);
+        if (posix_memalign((void**)&inputBuffer->mBuffers[0].mData, 16, bufferSizeBytes) != 0) {
+            // Handle allocation failure
+            std::cout << ("Memory allocation failed!\n") << std::endl;
+        }
     }
 
+    // std::cout << "BusNumber: " << inputBuffer->mBuffers[0].mNumberChannels << std::endl;
+    // std::cout << "BusNumber: " << inBusNumber << std::endl;
+    // std::cout << "NumberFrames: " << inNumberFrames << std::endl;
+    // std::cout << inputBuffer->mNumberBuffers << std::endl;
+    // std::cout << "bufferSizeBytes: " << bufferSizeBytes << std::endl;
+
+    std::cout << "Trying to render input from bus: " << inBusNumber << std::endl;
     // Fetch the audio data from the system
     OSStatus status = AudioUnitRender(audioUnit, ioActionFlags, inTimeStamp,
-                                      inBusNumber, inNumberFrames, inputBuffer);
+                                      1, inNumberFrames, inputBuffer);
     if (status != noErr) {
         std::cerr << "Error rendering audio: " << status << std::endl;
-        free(inputBuffer->mBuffers[0].mData);
+        // free(inputBuffer->mBuffers[0].mData);
         return status;
     }
 
@@ -106,52 +118,95 @@ OSStatus AudioTapCallback(void* inRefCon,
     return noErr;
 }
 
-void getDeviceStreamFormats(AudioDeviceID &device_id, AudioStreamBasicDescription &stream_format){
-    // now we have to get each of the fields of the AudioStreamBasicDescription struct
-    // by getting each of the fields one-by-one using the deviceID
-    // Following are the fields
-    // mSampleRate
-    double current_sample_rate;
-    getSampleRate(device_id, current_sample_rate);
-    // mFormatID
-    AudioFormatID current_audio_format_id;
-    getFormatID(device_id, current_audio_format_id);
-    // mFormatFlags
-    AudioFormatFlags current_audio_format_flags;
-    getFormatFlags(device_id, current_audio_format_flags);
-    // mBitsPerChannel
-    unsigned int current_bits_per_chanel;
-    getBitsPerChannel(device_id, current_bits_per_chanel);
-    // mChannelsPerFrame
-    unsigned int current_channels_per_frame;
-    getChannelsPerFrame(device_id, current_channels_per_frame);
-    // mBytesPerFrame
-    unsigned int current_bytes_per_frame;
-    getBytesPerFrame(device_id, current_bytes_per_frame);
-    // mBytesPerPacket
-    unsigned int current_bytes_per_packet;
-    getBytesPerPacket(device_id, current_bytes_per_packet);
-    // mFramesPerPacket
-    unsigned int current_frames_per_packet;
-    getFramesPerPacket(device_id, current_frames_per_packet);
-
-
-    stream_format.mSampleRate = current_sample_rate;
-    stream_format.mFormatID = current_audio_format_id;
-    stream_format.mFormatFlags = current_audio_format_flags;
-    stream_format.mBitsPerChannel = current_bits_per_chanel;
-    stream_format.mChannelsPerFrame = current_channels_per_frame;
-    stream_format.mBytesPerFrame = current_bytes_per_frame;
-    stream_format.mBytesPerPacket = current_bytes_per_packet;
-    stream_format.mFramesPerPacket = current_frames_per_packet;
-}
+//void getDeviceStreamFormats(AudioDeviceID &device_id, AudioStreamBasicDescription &stream_format){
+//    // now we have to get each of the fields of the AudioStreamBasicDescription struct
+//    // by getting each of the fields one-by-one using the deviceID
+//    // Following are the fields
+//    // mSampleRate
+//    double current_sample_rate;
+//    getSampleRate(device_id, current_sample_rate);
+//    // mFormatID
+//    AudioFormatID current_audio_format_id;
+//    getFormatID(device_id, current_audio_format_id);
+//    // mFormatFlags
+//    AudioFormatFlags current_audio_format_flags;
+//    getFormatFlags(device_id, current_audio_format_flags);
+//    // mBitsPerChannel
+//    unsigned int current_bits_per_chanel;
+//    getBitsPerChannel(device_id, current_bits_per_chanel);
+//    // mChannelsPerFrame
+//    unsigned int current_channels_per_frame;
+//    getChannelsPerFrame(device_id, current_channels_per_frame);
+//    // mBytesPerFrame
+//    unsigned int current_bytes_per_frame;
+//    getBytesPerFrame(device_id, current_bytes_per_frame);
+//    // mBytesPerPacket
+//    unsigned int current_bytes_per_packet;
+//    getBytesPerPacket(device_id, current_bytes_per_packet);
+//    // mFramesPerPacket
+//    unsigned int current_frames_per_packet;
+//    getFramesPerPacket(device_id, current_frames_per_packet);
+//
+//
+//    stream_format.mSampleRate = current_sample_rate;
+//    stream_format.mFormatID = current_audio_format_id;
+//    stream_format.mFormatFlags = current_audio_format_flags;
+//    stream_format.mBitsPerChannel = current_bits_per_chanel;
+//    stream_format.mChannelsPerFrame = current_channels_per_frame;
+//    stream_format.mBytesPerFrame = current_bytes_per_frame;
+//    stream_format.mBytesPerPacket = current_bytes_per_packet;
+//    stream_format.mFramesPerPacket = current_frames_per_packet;
+//}
 
 void SetupAudioTap(AudioDeviceID deviceID) {
     // Get the stream format
     AudioStreamBasicDescription stream_format;
-    getDeviceStreamFormats(deviceID, stream_format);
+    UInt32 stream_format_size = sizeof(AudioStreamBasicDescription);
+
+    AudioObjectPropertyAddress propertyAddress = {
+        kAudioStreamPropertyPhysicalFormat,
+        kAudioObjectPropertyScopeOutput,
+        kAudioObjectPropertyElementMain
+    };
+
+    OSStatus status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
+    if (status != noErr) {
+        std::cerr << "Error retrieving stream format: " << status << std::endl;
+        return;
+    }
+
+    std::cout << std::fixed;
+    std::cout << "----- Audio Stream Format Info -----" << std::endl;
+    std::cout << "Sample Rate: " << stream_format.mSampleRate << " Hz" << std::endl;
+
+    char formatID[5] = {0};
+    UInt32 swappedFormat = CFSwapInt32HostToBig(stream_format.mFormatID);
+    memcpy(formatID, &swappedFormat, sizeof(UInt32));
+    std::cout << "Format ID: '" << formatID << "' (0x" << std::hex << stream_format.mFormatID << std::dec << ")" << std::endl;
+
+    std::cout << "Format Flags: 0x" << std::hex << stream_format.mFormatFlags << std::dec << std::endl;
+    if (stream_format.mFormatFlags & kAudioFormatFlagIsFloat) {
+        std::cout << "  • Format is Float" << std::endl;
+    }
+    if (stream_format.mFormatFlags & kAudioFormatFlagIsPacked) {
+        std::cout << "  • Format is Packed" << std::endl;
+    }
+    if (stream_format.mFormatFlags & kAudioFormatFlagIsSignedInteger) {
+        std::cout << "  • Format is Signed Integer" << std::endl;
+    }
+
+    std::cout << "Bits Per Channel: " << stream_format.mBitsPerChannel << std::endl;
+    std::cout << "Bytes Per Frame: " << stream_format.mBytesPerFrame << std::endl;
+    std::cout << "Channels Per Frame: " << stream_format.mChannelsPerFrame << std::endl;
+    std::cout << "Bytes Per Packet: " << stream_format.mBytesPerPacket << std::endl;
+    std::cout << "Frames Per Packet: " << stream_format.mFramesPerPacket << std::endl;
+    std::cout << "------------------------------------" << std::endl;
+
 
     // generate description that will match audio HAL
+    // the OSType is kAudioUnitManufacturer_Apple, cuz even though
+    // it's an external DAC, the applications still interface it
+    // through Apple's Audio Unit API
     AudioComponentDescription hal_desc = {
         kAudioUnitType_Output,
         kAudioUnitSubType_HALOutput,
@@ -166,7 +221,7 @@ void SetupAudioTap(AudioDeviceID deviceID) {
 
     // Create an Audio Unit
     AudioUnit audioUnit;
-    OSStatus status = AudioComponentInstanceNew(comp, &audioUnit);
+    status = AudioComponentInstanceNew(comp, &audioUnit);
     if (status != noErr) {
         std::cerr << "Error creating audio component instance: " << status << std::endl;
         return;
@@ -216,6 +271,12 @@ void SetupAudioTap(AudioDeviceID deviceID) {
         std::cerr << "Error setting input callback: " << status << std::endl;
         return;
     }
+
+//    status = AudioUnitAddRenderNotify(audioUnit, AudioTapCallback, nullptr);
+//    if (status != noErr) {
+//        std::cerr << "Error setting the notify callback: " << status << std::endl;
+//        return;
+//    }
 
     // Initialize and start the audio unit
     status = AudioUnitInitialize(audioUnit);

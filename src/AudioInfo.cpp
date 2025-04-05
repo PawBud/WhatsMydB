@@ -2,6 +2,12 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <AudioToolbox/AudioToolbox.h>
 
+#include <iostream>
+#include <CoreFoundation/CoreFoundation.h>
+#include <AudioToolbox/AudioToolbox.h>
+
+
+// useless code, to remove
 void getDeviceID(AudioDeviceID &device_id) {
     unsigned int device_id_size = sizeof(device_id);
     // Get the current output device
@@ -236,24 +242,69 @@ void getFormatFlags(AudioDeviceID const device_id, AudioFormatFlags &audio_forma
     }
 }
 
+//void getBitsPerChannel(AudioDeviceID const device_id, unsigned int &bits_per_channel) {
+//    AudioStreamBasicDescription stream_format;
+//    UInt32 stream_format_size = sizeof(AudioStreamBasicDescription);
+//
+//    AudioObjectPropertyAddress propertyAddress = {
+//        kAudioStreamPropertyPhysicalFormat,
+//        kAudioObjectPropertyScopeOutput,
+//        kAudioObjectPropertyElementMain
+//    };
+//
+//    OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
+//    if (status != noErr) {
+//        std::cerr << "Error retrieving stream format: " << status << std::endl;
+//    } else {
+//        bits_per_channel = stream_format.mBitsPerChannel;
+//        std::cout << "THIS IS Bits Per Channel: " << bits_per_channel << std::endl;
+//    }
+//}
+
 void getBitsPerChannel(AudioDeviceID const device_id, unsigned int &bits_per_channel) {
     AudioStreamBasicDescription stream_format;
     UInt32 stream_format_size = sizeof(AudioStreamBasicDescription);
 
+    // Prepare address for stream format
     AudioObjectPropertyAddress propertyAddress = {
         kAudioStreamPropertyPhysicalFormat,
         kAudioObjectPropertyScopeOutput,
         kAudioObjectPropertyElementMain
     };
 
+    // Get stream format
     OSStatus status = AudioObjectGetPropertyData(device_id, &propertyAddress, 0, nullptr, &stream_format_size, &stream_format);
     if (status != noErr) {
         std::cerr << "Error retrieving stream format: " << status << std::endl;
-    } else {
-        bits_per_channel = stream_format.mBitsPerChannel;
-        std::cout << "Bits Per Channel: " << bits_per_channel << std::endl;
+        return;
     }
+
+//    // Print key stream format info
+//    std::cout << "Sample Rate: " << stream_format.mSampleRate << " Hz" << std::endl;
+//    std::cout << "Format ID: '"
+//              << static_cast<char>((stream_format.mFormatID >> 24) & 0xFF)
+//              << static_cast<char>((stream_format.mFormatID >> 16) & 0xFF)
+//              << static_cast<char>((stream_format.mFormatID >> 8) & 0xFF)
+//              << static_cast<char>((stream_format.mFormatID) & 0xFF)
+//              << "' (0x" << std::hex << stream_format.mFormatID << std::dec << ")" << std::endl;
+
+    // Check format flags
+    std::cout << "Format Flags: " << std::hex << stream_format.mFormatFlags << std::dec << std::endl;
+    if (stream_format.mFormatFlags & kAudioFormatFlagIsFloat) {
+        std::cout << "Format is Float" << std::endl;
+    }
+    if (stream_format.mFormatFlags & kAudioFormatFlagIsPacked) {
+        std::cout << "Format is Packed" << std::endl;
+    }
+    if (stream_format.mFormatFlags & kAudioFormatFlagIsSignedInteger) {
+        std::cout << "Format is Signed Integer" << std::endl;
+    }
+
+    // Finally: bits per channel
+    bits_per_channel = stream_format.mBitsPerChannel;
+    std::cout << "THIS IS NOW THE Bits Per Channel: " << bits_per_channel << std::endl;
 }
+
 
 void getBytesPerFrame(AudioDeviceID const device_id, unsigned int &bytes_per_frame) {
     AudioStreamBasicDescription stream_format;
@@ -333,16 +384,19 @@ void getFramesPerPacket(AudioDeviceID const device_id, unsigned int &frames_per_
     }
 }
 
-unsigned int getBufferFrameSize(AudioUnit const audioUnit) {
-    unsigned int bufferSizeFrames = 0;
+unsigned int getBufferNumberOfFrames(AudioUnit const audioUnit) {
+    unsigned int bufferNumberOfFrames = 0;
     unsigned int propertySize = sizeof(unsigned int);
 
-    OSStatus status = AudioUnitGetProperty(audioUnit, kAudioDevicePropertyBufferFrameSize, kAudioUnitScope_Global, 0, &bufferSizeFrames, &propertySize);
+    OSStatus status = AudioUnitGetProperty(audioUnit, kAudioDevicePropertyBufferFrameSize, kAudioUnitScope_Global, 0, &bufferNumberOfFrames, &propertySize);
     if (status != noErr) {
         std::cerr << "Couldn't get buffer frame size from input unit " << status << std::endl;
     }
 
-    UInt32 bufferSizeBytes = bufferSizeFrames * sizeof(Float32);
+    UInt32 bufferSizeBytes = bufferNumberOfFrames * sizeof(Float32);
 
     return bufferSizeBytes;
+}
+
+void printStreamFormatDetails(AudioDeviceID const device_id) {
 }
