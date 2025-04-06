@@ -3,6 +3,7 @@
 #include <CoreAudio/CoreAudio.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include "AudioTapper.h"
+#include "VirtualAudioDriver.h"
 
 OSStatus GetAudioDeviceName(AudioDeviceID deviceID, std::string& deviceName)
 {
@@ -96,7 +97,7 @@ int main()
         return 1;
     }
 
-    SetupAudioTap(outputDeviceID);
+    SetupBlackHoleTap();
 
     return 0;
 }

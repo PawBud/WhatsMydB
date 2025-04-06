@@ -9,6 +9,8 @@ add_executable(
         src/GetAudioDevice.cpp
         src/AudioTapper.cpp
         src/AudioTapper.h
+        src/VirtualAudioDriver.cpp
+        src/VirtualAudioDriver.h
 )
 
 target_link_libraries(
